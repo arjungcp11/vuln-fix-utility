@@ -2,13 +2,9 @@
 pipeline {
     agent any
 
-    tools {
-        jdk 'JDK17'
-        maven 'MAVEN3'
-    }
 
     environment {
-        SONAR_SCANNER_OPTS = "-Xmx512m"
+        SONAR_SCANNER_OPTS = "sonarqube"
     }
 
     stages {
