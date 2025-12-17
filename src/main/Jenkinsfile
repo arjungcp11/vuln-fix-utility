@@ -1,0 +1,17 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'M3'
+        jdk 'JDK17'
+    }
+
+   
+        stage('install') {
+            steps {
+                bat 'mvn install'
+            }
+        }
+
+           }
+}
