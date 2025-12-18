@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.hexa.vulnfix.service.PomUpdateService;
+import com.hexa.vulnfix.service.ProjectScannerService;
 import com.hexa.vulnfix.service.RezipService;
 import com.hexa.vulnfix.service.ZipService;
 import com.hexa.vulnfix.serviceImpl.OwaspScanService;
@@ -35,11 +36,16 @@ public class UploadController {
 	@Value("${scan.project.path}")
 	private String projectPath;
 
-	@Value("${scan.output.path}")
-	private String outputPath;
+	
 
 	@Value("${scan.pom.only}")
 	private boolean scanPomOnly;
+	
+	@Value("${scan.output.path}")
+	private String baseOutputPath;
+	
+	@Autowired
+	ProjectScannerService projectScannerService;
 
 	// Scheduled automatic scan
 	@Scheduled(cron = "${scan.cron}")
@@ -51,6 +57,8 @@ public class UploadController {
 				pom.updateProject(path);
 				log.info("Scanning POM only...");
 			} else {
+				Path targetProjectDir = Paths.get(baseOutputPath);
+				projectScannerService.scanAndUpdateProject(path, targetProjectDir);
 				log.info("Scanning full project...");
 			}
 		} catch (Exception e) {

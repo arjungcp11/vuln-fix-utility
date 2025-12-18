@@ -35,6 +35,11 @@
 			<artifactId>dependency-check-utils</artifactId>
 			<version>9.0.7</version>
 		</dependency>
+		<dependency>
+			<groupId>com.github.javaparser</groupId>
+			<artifactId>javaparser-core</artifactId>
+			<version>3.27.0</version>
+		</dependency>
 
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
