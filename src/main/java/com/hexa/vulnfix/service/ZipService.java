@@ -1,5 +1,5 @@
 
-package com.example.vulnfix.service;
+package com.hexa.vulnfix.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
