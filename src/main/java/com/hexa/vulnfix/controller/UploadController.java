@@ -3,15 +3,13 @@ package com.hexa.vulnfix.controller;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
-import com.hexa.vulnfix.model.VulnerabilitySummary;
 import com.hexa.vulnfix.service.PomUpdateService;
 import com.hexa.vulnfix.service.RezipService;
 import com.hexa.vulnfix.service.ZipService;
@@ -19,6 +17,8 @@ import com.hexa.vulnfix.serviceImpl.OwaspScanService;
 
 @RestController
 public class UploadController {
+
+    private static final Logger log = LoggerFactory.getLogger(UploadController.class);
 
 	@Autowired
 	private ZipService zip;
@@ -41,17 +41,17 @@ public class UploadController {
 	@Value("${scan.pom.only}")
 	private boolean scanPomOnly;
 
-	// 🔁 Scheduled automatic scan
+	// Scheduled automatic scan
 	@Scheduled(cron = "${scan.cron}")
 	public void scheduledScan() {
 		try {
 			Path path = Paths.get(projectPath);
-			System.out.println("Scheduled scan started...");
+			log.info("Scheduled scan started...");
 			if (scanPomOnly) {
 				pom.updateProject(path);
-				System.out.println("Scanning POM only...");
+				log.info("Scanning POM only...");
 			} else {
-				System.out.println("Scanning full project...");
+				log.info("Scanning full project...");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

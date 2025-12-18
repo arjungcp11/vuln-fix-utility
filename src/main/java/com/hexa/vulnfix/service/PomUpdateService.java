@@ -14,12 +14,17 @@ import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.hexa.vulnfix.controller.UploadController;
+
 @Service
 public class PomUpdateService {
+	private static final Logger log = LoggerFactory.getLogger(PomUpdateService.class);
 
 	@Value("${scan.output.path}")
 	private String baseOutputPath;
@@ -44,7 +49,7 @@ public class PomUpdateService {
 
 		if (!Files.exists(sourceProjectDir)) {
 			Files.createDirectories(sourceProjectDir); // 👈 creates full path safely
-			System.out.println("Created base directory: " + sourceProjectDir);
+			log.info("Created base directory: " + sourceProjectDir);
 		}
 		// Validate project
 		Path originalPom = sourceProjectDir.resolve("pom.xml");
@@ -80,7 +85,7 @@ public class PomUpdateService {
 			new MavenXpp3Writer().write(writer, model);
 		}
 
-		System.out.println("✅ Project updated at: " + targetProjectDir);
+		log.info("Project updated at: " + targetProjectDir);
 	}
 
 	private void updateDependencies(Model model) {
@@ -90,7 +95,7 @@ public class PomUpdateService {
 		for (Dependency d : model.getDependencies()) {
 			String safeVersion = safeVersions.get(d.getArtifactId());
 			if (safeVersion != null) {
-				System.out.println("Updating " + d.getArtifactId() + " → " + safeVersion);
+				log.info("Updating " + d.getArtifactId() + " → " + safeVersion);
 				d.setVersion(safeVersion);
 			}
 		}
