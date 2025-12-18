@@ -2,6 +2,7 @@ package com.hexa.vulnfix.controller;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +20,7 @@ import com.hexa.vulnfix.serviceImpl.OwaspScanService;
 @RestController
 public class UploadController {
 
-    private static final Logger log = LoggerFactory.getLogger(UploadController.class);
+	private static final Logger log = LoggerFactory.getLogger(UploadController.class);
 
 	@Autowired
 	private ZipService zip;
@@ -36,64 +37,43 @@ public class UploadController {
 	@Value("${scan.project.path}")
 	private String projectPath;
 
-	
-
 	@Value("${scan.pom.only}")
 	private boolean scanPomOnly;
-	
+
 	@Value("${scan.output.path}")
 	private String baseOutputPath;
-	
+
 	@Autowired
 	ProjectScannerService projectScannerService;
+	private final AtomicBoolean scanCompleted = new AtomicBoolean(false);
 
-	// Scheduled automatic scan
+
 	@Scheduled(cron = "${scan.cron}")
 	public void scheduledScan() {
-		try {
-			Path path = Paths.get(projectPath);
-			log.info("Scheduled scan started...");
-			if (scanPomOnly) {
-				pom.updateProject(path);
-				log.info("Scanning POM only...");
-			} else {
-				Path targetProjectDir = Paths.get(baseOutputPath);
-				projectScannerService.scanAndUpdateProject(path, targetProjectDir);
-				log.info("Scanning full project...");
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+
+	    if (scanCompleted.get()) {
+	        return; 
+	    }
+
+	    try {
+	        Path path = Paths.get(projectPath);
+	        log.info("Scheduled scan started...");
+
+	        if (scanPomOnly) {
+	            pom.updateProject(path);
+	            log.info("Scanning POM done only...");
+	        } else {
+	            Path targetProjectDir = Paths.get(baseOutputPath);
+	            projectScannerService.scanAndUpdateProject(path, targetProjectDir);
+	            log.info("Scanning full project done ...");
+	        }
+
+	        scanCompleted.set(true);
+
+	    } catch (Exception e) {
+	        log.error("Scheduled scan failed", e);
+	    }
 	}
 
-//	@PostMapping("/upload")
-//	public VulnerabilitySummary upload(@RequestParam MultipartFile file, @RequestParam boolean scanPomOnly)
-//			throws Exception {
-//
-//		Path projectDir = zip.extract(file);
-//
-//		if (scanPomOnly) {
-//
-////        	PomVulnerabilityFixer fixer = new PomVulnerabilityFixer(); No use of this class now due to direct pom update in PomFixService
-////        	fixer.updatePom(projectDir);
-//			pom.updatePom(projectDir);
-//			VulnerabilitySummary summary = owasp.scanAndSummarizePomOnly(projectDir);
-//
-//			if (summary.getCritical() > 0) {
-//				throw new RuntimeException("CRITICAL vulnerabilities found in POM file. Build stopped.");
-//			}
-//
-//			return summary;
-//		} else {
-//			pom.updatePom(projectDir);
-//			VulnerabilitySummary summary = owasp.scanAndSummarize(projectDir);
-//
-//			if (summary.getCritical() > 0) {
-//				throw new RuntimeException("CRITICAL vulnerabilities found. Build stopped.");
-//			}
-//
-//			rezip.zip(projectDir);
-//			return summary;
-//		}
-//	}
+
 }
