@@ -1,7 +1,0 @@
-com\example\vulnfix\controller\UploadController.class
-com\example\vulnfix\service\OwaspScanService.class
-com\example\vulnfix\model\VulnerabilitySummary.class
-com\example\vulnfix\service\ZipService.class
-com\example\vulnfix\service\RezipService.class
-com\example\vulnfix\VulnFixApplication.class
-com\example\vulnfix\service\PomFixService.class
