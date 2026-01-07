@@ -1,6 +1,7 @@
 
 package com.hexa.vulnfix.service;
 
+import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -9,6 +10,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Map;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
@@ -19,8 +23,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
-import com.hexa.vulnfix.controller.UploadController;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 @Service
 public class PomUpdateService {
@@ -64,7 +69,7 @@ public class PomUpdateService {
 		// Copy full project
 		copyProject(sourceProjectDir, targetProjectDir);
 
-		// 4️⃣ Read copied pom.xml
+		// Read copied pom.xml
 		Path pomPath = targetProjectDir.resolve("pom.xml");
 
 		Model model;
@@ -115,4 +120,61 @@ public class PomUpdateService {
 			}
 		});
 	}
+	
+	public void getOldPomFileTextAsReferance(Path sourceProjectDir) throws Exception {
+
+	    if (!Files.exists(sourceProjectDir)) {
+	        throw new RuntimeException("Project folder not found: " + sourceProjectDir);
+	    }
+
+	    Path pomPath = sourceProjectDir.resolve("pom.xml");
+
+	    if (!Files.exists(pomPath)) {
+	        throw new RuntimeException("pom.xml not found in project");
+	    }
+
+	    // Parse pom.xml
+	    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+	    factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+	    factory.setExpandEntityReferences(false);
+
+	    DocumentBuilder builder = factory.newDocumentBuilder();
+	    Document document = builder.parse(pomPath.toFile());
+
+	    NodeList dependencyNodes = document.getElementsByTagName("dependency");
+
+	    // Output file on D drive
+	    Path outputFile = Paths.get("D:/safe-dependencies.txt");
+
+	    try (BufferedWriter writer = Files.newBufferedWriter(outputFile)) {
+
+	        for (int i = 0; i < dependencyNodes.getLength(); i++) {
+	            Element dependency = (Element) dependencyNodes.item(i);
+
+	            String groupId = getTagValue(dependency, "groupId");
+	            String artifactId = getTagValue(dependency, "artifactId");
+	            String version = getTagValue(dependency, "version");
+
+	            // Skip dependencies without version (managed by parent/BOM)
+	            if (artifactId == null || version == null) {
+	                continue;
+	            }
+
+	            String key = "safe-dependencies.versions." + artifactId;
+	            String line = key + "=" + version;
+
+	            writer.write(line);
+	            writer.newLine();
+	        }
+	    }
+	}
+	
+	private String getTagValue(Element parent, String tagName) {
+	    NodeList nodes = parent.getElementsByTagName(tagName);
+	    if (nodes == null || nodes.getLength() == 0) {
+	        return null;
+	    }
+	    return nodes.item(0).getTextContent().trim();
+	}
+
 }

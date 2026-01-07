@@ -42,6 +42,11 @@ public class UploadController {
 
 	@Value("${scan.output.path}")
 	private String baseOutputPath;
+	
+	@Value("${old.pom.file.text}")
+	private boolean oldPomFileText;
+	
+	
 
 	@Autowired
 	ProjectScannerService projectScannerService;
@@ -60,8 +65,16 @@ public class UploadController {
 	        log.info("Scheduled scan started...");
 
 	        if (scanPomOnly) {
-	            pom.updateProject(path);
-	            log.info("Scanning POM done only...");
+	        	if (oldPomFileText) {
+	        		pom.getOldPomFileTextAsReferance(path);
+	        		log.info("Scanning pom.xml and extracting dependency versions...");
+	        		log.info("Dependency version file created successfully. Copy the content and paste it into application.properties.");
+
+				} else {
+					pom.updateProject(path);
+		            log.info("Scanning POM done only...");
+				}
+	            
 	        } else {
 	            Path targetProjectDir = Paths.get(baseOutputPath);
 	            projectScannerService.scanAndUpdateProject(path, targetProjectDir);

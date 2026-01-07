@@ -1,0 +1,12 @@
+com\hexa\vulnfix\serviceImpl\ProjectScannerServiceImp.class
+com\hexa\vulnfix\controller\UploadController.class
+com\hexa\vulnfix\service\OwaspScanServiceImp.class
+com\hexa\vulnfix\service\RezipService.class
+com\hexa\vulnfix\service\ZipService.class
+com\hexa\vulnfix\VulnFixApplication.class
+com\hexa\vulnfix\service\ProjectScannerService.class
+com\hexa\vulnfix\service\PomVulnerabilityFixer.class
+com\hexa\vulnfix\model\VulnerabilitySummary.class
+com\hexa\vulnfix\service\PomUpdateService.class
+com\hexa\vulnfix\service\SafeDependencyConfig.class
+com\hexa\vulnfix\serviceImpl\OwaspScanService.class
