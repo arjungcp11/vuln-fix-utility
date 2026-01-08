@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -40,58 +42,89 @@ public class PomUpdateService {
 	@Autowired
 	private SafeDependencyConfig safeDependencyConfig;
 
-	public void updateProject(Path sourceProjectDir) throws Exception {
+	public void updateProjectPomFile(Path projectDir) throws Exception {
 
-		if (!Files.exists(sourceProjectDir)) {
-			throw new RuntimeException("Project folder not found: " + sourceProjectDir);
-		}
+	    if (projectDir == null || !Files.exists(projectDir) || !Files.isDirectory(projectDir)) {
+	        throw new RuntimeException("Invalid project directory: " + projectDir);
+	    }
 
-		Path pomPath1 = sourceProjectDir.resolve("pom.xml");
+	    Path pomPath = projectDir.resolve("pom.xml");
+	    if (!Files.exists(pomPath)) {
+	        throw new RuntimeException("pom.xml not found in project: " + projectDir);
+	    }
 
-		if (!Files.exists(pomPath1)) {
-			throw new RuntimeException("pom.xml not found in project");
-		}
+	    log.info("Updating pom.xml at: {}", pomPath);
 
-		if (!Files.exists(sourceProjectDir)) {
-			Files.createDirectories(sourceProjectDir); // 👈 creates full path safely
-			log.info("Created base directory: " + sourceProjectDir);
-		}
-		// Validate project
-		Path originalPom = sourceProjectDir.resolve("pom.xml");
-		if (!Files.exists(originalPom)) {
-			throw new RuntimeException("pom.xml not found in project");
-		}
+	    Model model;
+	    try (FileReader reader = new FileReader(pomPath.toFile())) {
+	        model = new MavenXpp3Reader().read(reader);
+	    }
 
-		// Create output directory
-		String projectName = sourceProjectDir.getFileName().toString();
-		Path targetProjectDir = Paths.get(baseOutputPath, projectName + "-fixed-" + System.currentTimeMillis());
+	    // 4️⃣ Update dependencies ONLY
+	    updateDependencies(model);
 
-		// Copy full project
-		copyProject(sourceProjectDir, targetProjectDir);
+	    try (FileWriter writer = new FileWriter(pomPath.toFile())) {
+	        new MavenXpp3Writer().write(writer, model);
+	    }
 
-		// Read copied pom.xml
-		Path pomPath = targetProjectDir.resolve("pom.xml");
-
-		Model model;
-		try (FileReader reader = new FileReader(pomPath.toFile())) {
-			model = new MavenXpp3Reader().read(reader);
-		}
-
-		// Scan & update ONLY pom.xml if flag = true
-		if (scanPomOnly) {
-			updateDependencies(model);
-		} else {
-			// later: full project scan (classes, plugins, etc.)
-			updateDependencies(model);
-		}
-
-		// Write updated pom.xml
-		try (FileWriter writer = new FileWriter(pomPath.toFile())) {
-			new MavenXpp3Writer().write(writer, model);
-		}
-
-		log.info("Project updated at: " + targetProjectDir);
+	    log.info("pom.xml updated successfully (in-place)");
 	}
+	
+	
+	public void updateGradleProject(Path projectDir) throws IOException {
+
+	    if (projectDir == null || !Files.isDirectory(projectDir)) {
+	        throw new RuntimeException("Invalid project directory: " + projectDir);
+	    }
+
+	    Path buildGradle = projectDir.resolve("build.gradle");
+	    if (!Files.exists(buildGradle)) {
+	        throw new RuntimeException("build.gradle not found in project");
+	    }
+
+	    log.info("Updating Gradle build file: {}", buildGradle);
+
+	    List<String> lines = Files.readAllLines(buildGradle);
+	    List<String> updated = new ArrayList<>();
+
+	    Map<String, String> safeVersions = safeDependencyConfig.getVersions();
+
+	    for (String line : lines) {
+	        String modified = line;
+
+	        for (Map.Entry<String, String> entry : safeVersions.entrySet()) {
+	            String artifact = entry.getKey();
+	            String safeVersion = entry.getValue();
+
+	            // implementation 'group:artifact:version'
+	            modified = modified.replaceAll(
+	                    "(implementation|api|compileOnly|runtimeOnly)\\s+['\"]([^:'\"]+):"
+	                            + artifact + ":[^'\"]+['\"]",
+	                    "$1 '$2:" + artifact + ":" + safeVersion + "'"
+	            );
+
+	            // implementation(\"group:artifact:version\")
+	            modified = modified.replaceAll(
+	                    "(implementation|api|compileOnly|runtimeOnly)\\s*\\(\\s*['\"]([^:'\"]+):"
+	                            + artifact + ":[^'\"]+['\"]\\s*\\)",
+	                    "$1(\"$2:" + artifact + ":" + safeVersion + "\")"
+	            );
+	        }
+
+	        updated.add(modified);
+	    }
+
+	    // Backup (recommended)
+	    Files.copy(buildGradle,
+	            buildGradle.resolveSibling("build.gradle.bak"),
+	            StandardCopyOption.REPLACE_EXISTING);
+
+	    Files.write(buildGradle, updated);
+
+	    log.info("build.gradle updated successfully (in-place)");
+	}
+
+
 
 	private void updateDependencies(Model model) {
 
