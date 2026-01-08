@@ -1,5 +1,8 @@
 package com.hexa.vulnfix.controller;
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -13,9 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.hexa.vulnfix.service.PomUpdateService;
 import com.hexa.vulnfix.service.ProjectScannerService;
-import com.hexa.vulnfix.service.RezipService;
-import com.hexa.vulnfix.service.ZipService;
-import com.hexa.vulnfix.serviceImpl.OwaspScanService;
 
 @RestController
 public class UploadController {
@@ -23,16 +23,7 @@ public class UploadController {
 	private static final Logger log = LoggerFactory.getLogger(UploadController.class);
 
 	@Autowired
-	private ZipService zip;
-
-	@Autowired
 	private PomUpdateService pom;
-
-	@Autowired
-	private OwaspScanService owasp;
-
-	@Autowired
-	private RezipService rezip;
 
 	@Value("${scan.project.path}")
 	private String projectPath;
@@ -42,51 +33,92 @@ public class UploadController {
 
 	@Value("${scan.output.path}")
 	private String baseOutputPath;
-	
+
 	@Value("${old.pom.file.text}")
 	private boolean oldPomFileText;
-	
-	
+
+	@Value("${scan.classfiles.only}")
+	private boolean classFileScan;
 
 	@Autowired
 	ProjectScannerService projectScannerService;
 	private final AtomicBoolean scanCompleted = new AtomicBoolean(false);
 
-
 	@Scheduled(cron = "${scan.cron}")
-	public void scheduledScan() {
+	public void scheduledScan() throws Exception {
 
-	    if (scanCompleted.get()) {
-	        return; 
-	    }
+		if (scanCompleted.get()) {
+			return;
+		}
 
-	    try {
-	        Path path = Paths.get(projectPath);
-	        log.info("Scheduled scan started...");
+		Path baseDir = Paths.get(projectPath);
+		log.info("Scheduled scan started for base path: {}", baseDir);
 
-	        if (scanPomOnly) {
-	        	if (oldPomFileText) {
-	        		pom.getOldPomFileTextAsReferance(path);
-	        		log.info("Scanning pom.xml and extracting dependency versions...");
-	        		log.info("Dependency version file created successfully. Copy the content and paste it into application.properties.");
+		if (!Files.exists(baseDir) || !Files.isDirectory(baseDir)) {
+			log.warn("Invalid base directory: {}", baseDir);
+			return;
+		}
 
-				} else {
-					pom.updateProject(path);
-		            log.info("Scanning POM done only...");
+		try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(baseDir)) {
+
+			boolean projectFound = false;
+
+			for (Path projectDir : directoryStream) {
+
+				if (classFileScan) {
+					Path targetProjectDir = Paths.get(baseOutputPath);
+					projectScannerService.scanAndUpdateProject(projectDir, targetProjectDir);
+					log.info("Scanning full project done ...");
 				}
-	            
-	        } else {
-	            Path targetProjectDir = Paths.get(baseOutputPath);
-	            projectScannerService.scanAndUpdateProject(path, targetProjectDir);
-	            log.info("Scanning full project done ...");
-	        }
 
-	        scanCompleted.set(true);
+				if (!Files.isDirectory(projectDir)) {
+					continue;
+				}
 
-	    } catch (Exception e) {
-	        log.error("Scheduled scan failed", e);
-	    }
+				projectFound = true;
+				scanSingleProject(projectDir);
+			}
+
+			if (!projectFound) {
+				log.warn("No projects found in directory: {}", baseDir);
+			}
+
+		} catch (IOException e) {
+			log.error("Failed to scan projects in base directory: {}", baseDir, e);
+		}
 	}
 
+	private void scanSingleProject(Path projectDir) throws Exception {
+
+		log.info("--------------------------------------------------");
+		log.info("Scanning project: {}", projectDir.getFileName());
+
+		boolean isMaven = isMavenProject(projectDir);
+		boolean isGradle = isGradleProject(projectDir);
+
+		if (isMaven) {
+			log.info("Detected Maven project");
+			pom.updateProjectPomFile(projectDir);
+			log.info("pom.xml updated successfully");
+			return;
+		}
+
+		if (isGradle) {
+			log.info("Detected Gradle project");
+			pom.updateGradleProject(projectDir);
+			log.info("build.gradle updated successfully");
+			return;
+		}
+
+		log.warn("Skipping folder (not a Maven or Gradle project): {}", projectDir);
+	}
+
+	private boolean isMavenProject(Path projectDir) {
+		return Files.exists(projectDir.resolve("pom.xml"));
+	}
+
+	private boolean isGradleProject(Path projectDir) {
+		return Files.exists(projectDir.resolve("build.gradle")) || Files.exists(projectDir.resolve("build.gradle.kts"));
+	}
 
 }
